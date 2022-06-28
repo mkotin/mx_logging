@@ -2,6 +2,11 @@
 
 A logging UI for python project
 
+## Install
+```
+pip install mxlogging
+```
+
 ## Simple Example
 
 ```python
