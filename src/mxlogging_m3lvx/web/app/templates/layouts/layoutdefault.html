@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+
+    {% include 'partials/header.html' %}
+
+<body>
+  <div class="container-scroller">
+
+    {% include 'partials/navbar.html' %}
+
+    <div class="container-fluid page-body-wrapper">
+
+        {% include 'partials/sidebar.html' %}
+
+      <div class="main-panel">
+        <div class="content-wrapper">
+            {% block content %} {% endblock %}
+        </div>
+        <!-- content-wrapper ends -->
+
+        {% include 'partials/footer.html' %}
+
+      </div>
+      <!-- main-panel ends -->
+    </div>
+    <!-- page-body-wrapper ends -->
+  </div>
+  <!-- container-scroller -->
+
+  {% block footerscripts %}
+    {% include 'partials/footerscripts.html' %}
+  {% endblock %}
+</body>
+
+</html>
+

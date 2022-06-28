@@ -1,0 +1,318 @@
+{% extends 'layouts/layoutdefault.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-12 grid-margin stretch-card">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title d-inline">Logs</h5>
+          <!--<button class="btn btn-sm btn-secondary float-right">Export</button>-->
+          <button id="clearBtn" type="button" class="btn btn-sm btn-secondary float-right mr-2">Clear</button>
+          <p style="height: 3.5rem;" class="card-description">
+            <!--Add class <code>.table</code>-->
+          </p>
+          <!-- Search and filters start -->
+          <div class="row">
+              <div class="col-4">
+                <div class="form-group row">
+                    <div class="col">
+                      <p class="mb-1">Debug</p>
+                      <label class="toggle-switch toggle-switch-success">
+                        <input type="checkbox" checked data-level="debug" class="level-filter">
+                        <span class="toggle-slider round"></span>
+                      </label>                      
+                    </div>
+                    <div class="col">
+                        <p class="mb-1">Info</p>
+                      <label class="toggle-switch toggle-switch-info">
+                        <input type="checkbox" checked data-level="info" class="level-filter">
+                        <span class="toggle-slider round"></span>
+                      </label>                      
+                    </div>
+                    <div class="col">
+                        <p class="mb-1">Warning</p>
+                      <label class="toggle-switch toggle-switch-warning">
+                        <input type="checkbox" checked data-level="warning" class="level-filter">
+                        <span class="toggle-slider round"></span>
+                      </label>                      
+                    </div>
+                    <div class="col">
+                        <p class="mb-1">Error</p>
+                      <label class="toggle-switch toggle-switch-danger">
+                        <input type="checkbox" checked data-level="error" class="level-filter">
+                        <span class="toggle-slider round"></span>
+                      </label>                      
+                    </div>
+                    <div class="col">
+                        <p class="mb-1">Critical</p>
+                      <label class="toggle-switch toggle-switch-dark">
+                        <input type="checkbox" checked data-level="critical" class="level-filter">
+                        <span class="toggle-slider round"></span>
+                      </label>                      
+                    </div> 
+                  </div>
+                <!--<div class="btn-group" role="group" aria-label="Basic example">
+                    <button type="button" class="btn btn-sm btn-success">Debug</button>
+                    <button type="button" class="btn btn-sm btn-info">Info</button>
+                    <button type="button" class="btn btn-sm btn-warning">Warning</button>
+                    <button type="button" class="btn btn-sm btn-danger">Error</button>
+                    <button type="button" class="btn btn-sm btn-dark">Critical</button>
+                  </div>-->
+              </div>
+              <div class="col-1"></div>
+              <div class="col">
+                <form class="form-inline pt-2">
+                        <label >Thread &nbsp;</label>
+                        <select id="threadSelect"  class="js-example-basic-multiple form-control-sm" style="width: 50%;" multiple="multiple">
+                        <option selected value="all">All threads</option>
+                        </select>
+
+                        <label class="ml-2">Tail &nbsp;</label> 
+                        <input type="number" class="form-control form-control-sm"
+                        id="taillog" placeholder="Enter number">
+                </form>
+              </div>
+          </div>
+          <form class="form-inline mt-2">
+            <input type="text" class="form-control mb-2 mr-sm-2 w-100 form-control-sm"
+            id="globallogsearch" placeholder="Search anything ...">           
+          </form>
+          <!-- Search and filters end -->
+          <div class="table-responsive">
+            <table id="logstable" class="table">
+              <thead>
+                <tr>
+                  <th>Thread</th>
+                  <th>Time</th>
+                  <th>Level</th>
+                  <th>Message</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                  
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% include 'logs/logrecordmodal.html' %}
+{% endblock %}
+
+{% block footerscripts %}
+    {{ super() }}
+
+<!-- Connection to websoket server -->
+<script type="text/javascript" charset="utf-8">
+  $(document).ready(function(){
+    // Initialisation
+    let threads = []
+    let levelSearch = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+    let socket = io();
+    let logsTable = $('#logstable').DataTable({
+        paging: false,
+        dom: 'lrt',
+        sorting: false
+      });
+    initEvents() 
+    
+    
+    // Connect to the Socket.IO server.
+      // The connection URL has the following format, relative to the current page:
+      //     http[s]://<domain>:<port>[/<namespace>]
+      socket.on('connect', function() {
+          console.log("Connected to MXLogging Websocket server")
+          socket.emit("client_connected")
+      })
+
+      
+      // Handle new log record event
+      socket.on('new_log_record', function(msg) {
+          let log = JSON.parse(msg)
+          let logstr = msg.replace(/"/g, "'")
+
+          let logCol =  loglevelWidget(log.levelname)
+          registerThread(log.thread, log.threadName)
+          
+          let htmlRow = `<tr> \
+            <td class="d-none">${log.thread}</td> \
+            <td class="d-none">${log.levelname}</td> \
+            <td data-search='${log.thread}'>${log.threadName}</td> \
+            <td class="text-info">${log.asctime}</td> \
+            ${logCol} \
+            <td>${log.message}</td> \
+            <td> \
+                <span data-toggle="tooltip" data-placement="top" title="Details"> \
+                  <button data-record="${logstr}" data-toggle="modal" data-target="#logrecordmodal" type="button" class="btn btn-primary btn-sm btn-icon logdetails-btn"> \
+                      <i class="mdi mdi-format-align-justify"></i> \
+                    </button> \
+                </span> \
+            </td> \
+          </tr>`
+
+          logsTable.row.add($(htmlRow)).draw(false)
+      })
+      
+
+      function loglevelWidget(levelname) {
+        let widget = `{<td>${levelname}</td>`
+        switch (levelname) {
+          case 'DEBUG':
+            widget =  `<td><label class="badge badge-success">${levelname}</label></td>`
+            break
+          case 'INFO':
+            widget =  `<td><label class="badge badge-info">${levelname}</label></td>`
+            break
+          case 'WARNING':
+            widget =  `<td><label class="badge badge-warning">${levelname}</label></td>`
+            break
+          case 'ERROR':
+            widget =  `<td><label class="badge badge-danger">${levelname}</label></td>`
+            break
+          case 'CRITICAL':
+            widget =  `<td><label class="badge badge-dark">${levelname}</label></td>`
+            break
+        }
+
+        return widget
+      }
+
+      function registerThread(thread, threadName) {
+        if(threads.indexOf(thread) === -1)
+        {
+            threads.push(thread)
+            populateThreadSelectList(thread, threadName)
+        }
+      }
+
+      function populateThreadSelectList(thread, threadName) {
+        // let option = `<option value="${thread}">${threadName}</option>`
+        let newOption = new Option(threadName, thread, false, false);
+        $("#threadSelect").append(newOption).trigger('change')
+      }
+
+
+      function initEvents() {
+        // Global search
+        $("#globallogsearch").on('keyup', globalSearch)
+
+        // Thread filter
+        $("#threadSelect").on('select2:select', threadFilter)
+        $("#threadSelect").on('select2:unselect', threadFilter)
+
+        // Level filter
+        $(".level-filter").on("change", levelFilter)
+        $(".level-filter").on("click", levelCheck)
+        
+        // Log details
+        $(document).on("click", ".logdetails-btn", updateCurrentModalRecord)
+
+        // Clear logs
+        $("#clearBtn").on('click', clearLogs)
+      }
+
+      function clearLogs() {
+        logsTable.clear().draw()
+      }
+
+      function globalSearch(event) {
+        logsTable.search(event.target.value).draw()
+      }
+
+      function threadFilter(event) {
+        // 1- Manage selection
+        let selected = event.params.data.id
+        let selection = $(event.target).val()
+        if (!selection) {
+          selection = []
+        }
+        // console.log("selection")
+        // console.log(selection)
+        // console.log(selected)
+        
+        if(selected === "all" || selection.length === 0) {
+          // Remove all others
+          selection = ["all"]
+        } else {
+          // Remove all if in values
+          let i = selection.indexOf("all")
+          if(i >= 0) {
+            selection.splice(i, 1)
+          }
+        }
+
+        // console.log("newselection")
+        // console.log(selection)
+
+        $(event.target).val(selection) // Then set new values
+        $(event.target).trigger('change')
+
+        // 2- Apply filter
+        let selectionstr = selection.join('|')
+        // console.log("selectionstr")
+        // console.log(selectionstr)
+        
+        if(selectionstr === "all") {
+          logsTable.column(0).search("").draw()
+        } else {
+          logsTable.column(0).search(selectionstr, true).draw()
+        }
+        
+        // console.log(event)
+        // console.log(event.params.data)
+        // console.log($(event.target).select2('data'))
+      }
+
+      function levelCheck(event) {
+        if(levelSearch.length === 1 && !event.target.checked) {
+          event.preventDefault()
+        }
+      }
+      
+      function levelFilter(event) {
+
+        level = $(event.target).data("level").toUpperCase()
+        console.log(level)
+
+        isChecked = event.target.checked
+        let i = levelSearch.indexOf(level)
+        
+        if(isChecked) {
+          if(i < 0) {
+            levelSearch.push(level)
+          }
+        } else {
+          if(i >= 0) {
+            levelSearch.splice(i, 1)
+          }
+        }
+
+        levelSearchStr = levelSearch.join('|')
+
+        // console.log("levelSearchStr")
+        // console.log(levelSearchStr)
+
+        logsTable.column(1).search(levelSearchStr, true).draw()
+      }
+
+      function updateCurrentModalRecord(event) {
+        let currentRecord = $(event.currentTarget).data("record")
+        currentRecord = currentRecord.replace(/'/g, '"')
+        currentRecord = JSON.parse(currentRecord)
+
+        // Set values
+        for([key, value] of Object.entries(currentRecord)){
+          node = $("#logmodal" + key)
+          if(node && key !== "args") {
+            node.html(value)
+          }
+        }
+        
+        $("#logmodalargs").html(currentRecord.args.join())
+        
+      }
+  })
+</script>
+{% endblock %}
